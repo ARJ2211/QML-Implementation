@@ -16,8 +16,8 @@ from tqdm import tqdm
 NUM_QUBITS = 16
 NUM_LAYERS = 29
 NUM_CLASSES = 9
-NUM_EPOCHS = 30
-BATCH_SIZE = 8
+NUM_EPOCHS = 100
+BATCH_SIZE = 16
 LEARNING_RATE = 0.002
 os.makedirs("results", exist_ok=True)
 
@@ -47,7 +47,7 @@ def mera_block(weights, wires):
     qml.RY(weights[1], wires=wires[1])
 
 # ========== QNODE ==========
-dev = qml.device("default.qubit", wires=NUM_QUBITS)
+dev = qml.device("lightning.qubit", wires=NUM_QUBITS)
 
 def qnode(inputs, weights):
     qml.AngleEmbedding(inputs, wires=range(NUM_QUBITS), rotation="Y")
@@ -123,6 +123,12 @@ def train_model(model, train_loader, val_loader, device):
         val_accs.append(val_acc)
 
         print(f"Epoch {epoch+1}/{NUM_EPOCHS} | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
+    
+    torch.save(
+        model.state_dict(),
+        "quantum_hybrid_NN/results/hybrid_model_weights.pth"
+    )
+    print("Model saved to results/hybrid_model_weights.pth")
     return train_accs, val_accs
 
 # ========== EVALUATION ==========
@@ -136,6 +142,34 @@ def evaluate_model(model, test_loader, device):
             all_preds.extend(preds)
             all_labels.extend(y.numpy())
     return all_preds, all_labels
+
+# =========== SUMMARY ============
+def print_model_summary(model, input_shape):
+    print("Hybrid Quantum-Classical Model Summary")
+    print("="*60)
+
+    # Quantum layer (TorchLayer)
+    print("Quantum Layer:")
+    print(f"  Name: {type(model.qnn).__name__}")
+    print(f"  Input Shape: {input_shape}")
+    print(f"  Output Shape: ({NUM_QUBITS * 2},) [as expected by classifier]")
+    total_q_params = sum(p.numel() for p in model.qnn.parameters())
+    print(f"  Trainable Params: {total_q_params}")
+    print("-"*60)
+
+    # Classical part
+    print("Classical Classifier:")
+    total_c_params = 0
+    for idx, layer in enumerate(model.classifier):
+        name = type(layer).__name__
+        params = sum(p.numel() for p in layer.parameters() if p.requires_grad)
+        total_c_params += params
+        print(f"  [{idx}] {name:<15} → Params: {params}")
+
+    print("="*60)
+    print(f"Total Parameters: {total_q_params + total_c_params}")
+    print(f"Trainable: {total_q_params + total_c_params}")
+    print("="*60)
 
 # ========== PLOTTING ==========
 def plot_accuracy(train_acc, val_acc):
@@ -162,7 +196,9 @@ def plot_confusion_matrix(y_true, y_pred):
 
 # ========== RUN ==========
 if __name__ == "__main__":
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("mps" if torch.mps.is_available() else "cpu")
+    device = 'cpu'
+    print(device)
     (X_train, y_train), (X_val, y_val), (X_test, y_test) = load_dataset()
 
     train_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=BATCH_SIZE, shuffle=True)
@@ -170,6 +206,8 @@ if __name__ == "__main__":
     test_loader = DataLoader(TensorDataset(X_test, y_test), batch_size=BATCH_SIZE)
 
     model = HybridModel()
+    print_model_summary(model, input_shape=(NUM_QUBITS,))
+    
     train_acc, val_acc = train_model(model, train_loader, val_loader, device)
     plot_accuracy(train_acc, val_acc)
 
