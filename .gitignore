@@ -3,3 +3,4 @@ env/
 .envrc
 datasets/
 q_datasets/
+junk.py

@@ -10,7 +10,6 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
-from tqdm import tqdm
 
 # ========== CONFIG ==========
 NUM_QUBITS = 16
@@ -97,10 +96,7 @@ def train_model(model, train_loader, val_loader, device):
     for epoch in range(NUM_EPOCHS):
         model.train()
         correct = 0
-        for X, y in tqdm(
-            train_loader,
-            desc=f"Epoch {epoch+1}/{NUM_EPOCHS}"
-        ):
+        for X, y in train_loader:
             X, y = X.to(device), y.to(device)
             optimizer.zero_grad()
             out = model(X)
