@@ -4,3 +4,4 @@ env/
 datasets/
 q_datasets/
 junk.py
+.DS_Store

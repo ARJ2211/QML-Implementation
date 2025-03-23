@@ -18,7 +18,7 @@ NUM_LAYERS = 29
 NUM_CLASSES = 9
 NUM_EPOCHS = 100
 BATCH_SIZE = 16
-LEARNING_RATE = 0.002
+LEARNING_RATE = 0.0005
 os.makedirs("results", exist_ok=True)
 
 # ========== DATA LOADERS ==========
