@@ -16,7 +16,7 @@ from tqdm import tqdm
 NUM_QUBITS = 16
 NUM_LAYERS = 29
 NUM_CLASSES = 9
-NUM_EPOCHS = 100
+NUM_EPOCHS = 200
 BATCH_SIZE = 16
 LEARNING_RATE = 0.0005
 os.makedirs("results", exist_ok=True)
@@ -42,6 +42,7 @@ def load_dataset():
 
 # ========== QUANTUM BLOCK ==========
 def mera_block(weights, wires):
+    qml.Hadamard(wires=wires[0])
     qml.CNOT(wires=wires)
     qml.RY(weights[0], wires=wires[0])
     qml.RY(weights[1], wires=wires[1])
@@ -72,10 +73,16 @@ class HybridModel(nn.Module):
         super().__init__()
         self.qnn = q_layer
         self.classifier = nn.Sequential(
-            nn.Linear(NUM_QUBITS*2, 64),
+            nn.Linear(NUM_QUBITS * 2, 128),
+            nn.BatchNorm1d(128),
             nn.ReLU(),
             nn.Dropout(0.3),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.Dropout(0.2),
             nn.Linear(64, 32),
+            nn.BatchNorm1d(32),
             nn.ReLU(),
             nn.Dropout(0.2),
             nn.Linear(32, NUM_CLASSES)
@@ -181,7 +188,7 @@ def plot_accuracy(train_acc, val_acc):
     plt.title("Training vs Validation Accuracy")
     plt.legend()
     plt.grid()
-    plt.savefig("results/hybrid_accuracy_plot.png")
+    plt.savefig("quantum_hybrid_NN/results/hybrid_accuracy_plot.png")
     plt.show()
 
 def plot_confusion_matrix(y_true, y_pred):
@@ -191,7 +198,7 @@ def plot_confusion_matrix(y_true, y_pred):
     plt.xlabel("Predicted")
     plt.ylabel("True")
     plt.title("Confusion Matrix")
-    plt.savefig("results/hybrid_confusion_matrix.png")
+    plt.savefig("quantum_hybrid_NN/results/hybrid_confusion_matrix.png")
     plt.show()
 
 # ========== RUN ==========

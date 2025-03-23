@@ -16,10 +16,10 @@ from tqdm import tqdm
 NUM_QUBITS = 16
 NUM_LAYERS = 29
 NUM_CLASSES = 9
-NUM_EPOCHS = 50
+NUM_EPOCHS = 200
 BATCH_SIZE = 8
 LEARNING_RATE = 0.0005
-os.makedirs("results", exist_ok=True)
+os.makedirs("results_new", exist_ok=True)
 
 # ========== DATA LOADERS ==========
 def open_pkl(file_path):
@@ -42,6 +42,7 @@ def load_dataset():
 
 # ========== QUANTUM BLOCK ==========
 def mera_block(weights, wires):
+    qml.Hadamard(wires=wires[0])
     qml.CNOT(wires=wires)
     qml.RY(weights[0], wires=wires[0])
     qml.RY(weights[1], wires=wires[1])
@@ -78,7 +79,11 @@ class HybridModel(nn.Module):
             nn.BatchNorm1d(64),
             nn.ReLU(),
             nn.Dropout(0.2),
-            nn.Linear(64, NUM_CLASSES)
+            nn.Linear(64, 32),
+            nn.BatchNorm1d(32),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(32, NUM_CLASSES)
         )
 
     def forward(self, x):
@@ -126,8 +131,8 @@ def train_model(model, train_loader, val_loader, device):
         scheduler.step()
         print(f"Epoch {epoch+1}/{NUM_EPOCHS} | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
     
-    torch.save(model.state_dict(), "quantum_hybrid_NN/results/hybrid_model_weights.pth")
-    print("Model saved to results/hybrid_model_weights.pth")
+    torch.save(model.state_dict(), "quantum_hybrid_NN/results_new/hybrid_model_weights.pth")
+    print("Model saved to quantum_hybrid_NN/results_new/hybrid_model_weights.pth")
     return train_accs, val_accs
 
 # ========== EVALUATION ==========
@@ -175,7 +180,7 @@ def plot_accuracy(train_acc, val_acc):
     plt.title("Training vs Validation Accuracy")
     plt.legend()
     plt.grid()
-    plt.savefig("results/hybrid_accuracy_plot.png")
+    plt.savefig("quantum_hybrid_NN/results_new/hybrid_accuracy_plot.png")
     plt.show()
 
 def plot_confusion_matrix(y_true, y_pred):
@@ -185,7 +190,7 @@ def plot_confusion_matrix(y_true, y_pred):
     plt.xlabel("Predicted")
     plt.ylabel("True")
     plt.title("Confusion Matrix")
-    plt.savefig("results/hybrid_confusion_matrix.png")
+    plt.savefig("quantum_hybrid_NN/results_new/hybrid_confusion_matrix.png")
     plt.show()
 
 # ========== RUN ==========
