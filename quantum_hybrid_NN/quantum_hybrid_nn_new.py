@@ -19,19 +19,20 @@ NUM_CLASSES = 9
 NUM_EPOCHS = 200
 BATCH_SIZE = 8
 LEARNING_RATE = 0.0005
-os.makedirs("results_new", exist_ok=True)
 
 # ========== DATA LOADERS ==========
 def open_pkl(file_path):
     with open(file_path, 'rb') as f:
         return pkl.load(f)
 
-def load_dataset():
-    X_train = torch.stack(open_pkl("q_dataset/mera_features_Train.pkl"))
-    y_train = torch.tensor(open_pkl("q_dataset/mera_labels_Train.pkl")).long()
+def load_dataset(feature_type):
+    base_path = f"q_dataset/{feature_type}_features"
+    
+    X_train = torch.stack(open_pkl(os.path.join(base_path, "mera_features_Train.pkl")))
+    y_train = torch.tensor(open_pkl(os.path.join(base_path, "mera_labels_Train.pkl"))).long()
 
-    X_test = torch.stack(open_pkl("q_dataset/mera_features_Test.pkl"))
-    y_test = torch.tensor(open_pkl("q_dataset/mera_labels_Test.pkl")).long()
+    X_test = torch.stack(open_pkl(os.path.join(base_path, "mera_features_Test.pkl")))
+    y_test = torch.tensor(open_pkl(os.path.join(base_path, "mera_labels_Test.pkl"))).long()
 
     X_val = X_train[2175:]
     y_val = y_train[2175:]
@@ -39,6 +40,7 @@ def load_dataset():
     y_train = y_train[:2175]
 
     return (X_train, y_train), (X_val, y_val), (X_test, y_test)
+
 
 # ========== QUANTUM BLOCK ==========
 def mera_block(weights, wires):
@@ -67,11 +69,21 @@ q_layer = TorchLayer(qnode_torch, weight_shapes)
 
 # ========== MODEL ==========
 class HybridModel(nn.Module):
-    def __init__(self):
+    def __init__(self, feature_type):
         super().__init__()
+        self.feature_type = feature_type.upper()
         self.qnn = q_layer
+
+        # Input size based on feature type
+        if self.feature_type in ["HOG", "PCA"]:
+            self.input_dim = NUM_QUBITS*2
+        elif self.feature_type == "PATCH":
+            self.input_dim = NUM_QUBITS * NUM_QUBITS  # 16 patches -> each 16-dim output -> total 256
+        else:
+            raise ValueError("Unsupported feature type")
+
         self.classifier = nn.Sequential(
-            nn.Linear(NUM_QUBITS * 2, 128),
+            nn.Linear(self.input_dim, 128),
             nn.BatchNorm1d(128),
             nn.ReLU(),
             nn.Dropout(0.3),
@@ -87,16 +99,35 @@ class HybridModel(nn.Module):
         )
 
     def forward(self, x):
-        q_out = [self.qnn(xi) for xi in x]
-        q_out = torch.stack(q_out)
+        q_out = []
+
+        if self.feature_type in ["HOG", "PCA"]:
+            # x.shape = (B, 16)
+            for xi in x:
+                q_out.append(self.qnn(xi))  # Each xi -> (16,)
+        elif self.feature_type == "PATCH":
+            # x.shape = (B, 16, 16)
+            for xi in x:  # xi: (16, 16)
+                patch_outputs = [self.qnn(patch) for patch in xi]  # 16 × (16,)
+                merged = torch.cat(patch_outputs)  # -> (256,)
+                q_out.append(merged)
+
+        q_out = torch.stack(q_out)  # Final shape: (B, input_dim)
         return self.classifier(q_out)
+
 
 # ========== SCHEDULER ==========
 def get_scheduler(optimizer):
     return torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.8)
 
 # ========== TRAINING ==========
-def train_model(model, train_loader, val_loader, device):
+def train_model(
+        model,
+        train_loader,
+        val_loader,
+        device,
+        feature_name
+    ):
     model.to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
@@ -131,8 +162,8 @@ def train_model(model, train_loader, val_loader, device):
         scheduler.step()
         print(f"Epoch {epoch+1}/{NUM_EPOCHS} | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
     
-    torch.save(model.state_dict(), "quantum_hybrid_NN/results_new/hybrid_model_weights.pth")
-    print("Model saved to quantum_hybrid_NN/results_new/hybrid_model_weights.pth")
+    torch.save(model.state_dict(), f"quantum_hybrid_NN/results_{feature_name}/hybrid_model_weights.pth")
+    print(f"Model saved to quantum_hybrid_NN/results_{feature_name}/hybrid_model_weights.pth")
     return train_accs, val_accs
 
 # ========== EVALUATION ==========
@@ -164,14 +195,14 @@ def print_model_summary(model, input_shape):
         name = type(layer).__name__
         params = sum(p.numel() for p in layer.parameters() if p.requires_grad)
         total_c_params += params
-        print(f"  [{idx}] {name:<15} → Params: {params}")
+        print(f"  [{idx}] {name:<15} -> Params: {params}")
     print("="*60)
     print(f"Total Parameters: {total_q_params + total_c_params}")
     print(f"Trainable: {total_q_params + total_c_params}")
     print("="*60)
 
 # ========== PLOTTING ==========
-def plot_accuracy(train_acc, val_acc):
+def plot_accuracy(train_acc, val_acc, feature_name):
     plt.figure(figsize=(10, 5))
     plt.plot(train_acc, label="Train Accuracy")
     plt.plot(val_acc, label="Validation Accuracy")
@@ -180,35 +211,52 @@ def plot_accuracy(train_acc, val_acc):
     plt.title("Training vs Validation Accuracy")
     plt.legend()
     plt.grid()
-    plt.savefig("quantum_hybrid_NN/results_new/hybrid_accuracy_plot.png")
+    plt.savefig(f"quantum_hybrid_NN/results_{feature_name}/hybrid_accuracy_plot.png")
     plt.show()
 
-def plot_confusion_matrix(y_true, y_pred):
+def plot_confusion_matrix(y_true, y_pred, feature_name):
     cm = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt='d', cmap="Blues")
     plt.xlabel("Predicted")
     plt.ylabel("True")
     plt.title("Confusion Matrix")
-    plt.savefig("quantum_hybrid_NN/results_new/hybrid_confusion_matrix.png")
+    plt.savefig(f"quantum_hybrid_NN/results_{feature_name}/hybrid_confusion_matrix.png")
     plt.show()
 
 # ========== RUN ==========
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--features",
+        type=str,
+        choices=["HOG", "PCA", "PATCH"],
+        required=True,
+        help="Choose which feature set to use: HOG, PCA, or PATCH"
+    )
+    args = parser.parse_args()
+    os.makedirs(
+        f"quantum_hybrid_NN/results_{args.features}",
+        exist_ok=True
+    )
     device = torch.device("mps" if torch.mps.is_available() else "cpu")
     device = "cpu"
-    print(device)
-    (X_train, y_train), (X_val, y_val), (X_test, y_test) = load_dataset()
+    print(f"Device: {device}")
+    print(f"Using features from: {args.features}")
+
+    (X_train, y_train), (X_val, y_val), (X_test, y_test) = load_dataset(args.features)
 
     train_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(TensorDataset(X_val, y_val), batch_size=BATCH_SIZE)
     test_loader = DataLoader(TensorDataset(X_test, y_test), batch_size=BATCH_SIZE)
-
-    model = HybridModel()
+    # Infer input size based on feature type
+    model = HybridModel(feature_type=args.features)
     print_model_summary(model, input_shape=(NUM_QUBITS,))
-    train_acc, val_acc = train_model(model, train_loader, val_loader, device)
-    plot_accuracy(train_acc, val_acc)
+    train_acc, val_acc = train_model(model, train_loader, val_loader, device, args.features)
+    plot_accuracy(train_acc, val_acc, args.features)
 
     y_pred, y_true = evaluate_model(model, test_loader, device)
-    plot_confusion_matrix(y_true, y_pred)
+    plot_confusion_matrix(y_true, y_pred, args.features)
     print("Evaluation complete.")
+

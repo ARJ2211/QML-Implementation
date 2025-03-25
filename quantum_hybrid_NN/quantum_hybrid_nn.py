@@ -19,7 +19,7 @@ NUM_CLASSES = 9
 NUM_EPOCHS = 200
 BATCH_SIZE = 16
 LEARNING_RATE = 0.0005
-os.makedirs("results", exist_ok=True)
+os.makedirs("quantum_hybrid_NN/results", exist_ok=True)
 
 # ========== DATA LOADERS ==========
 def open_pkl(file_path):
