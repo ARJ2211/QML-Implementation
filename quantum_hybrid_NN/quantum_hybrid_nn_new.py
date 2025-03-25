@@ -69,11 +69,21 @@ q_layer = TorchLayer(qnode_torch, weight_shapes)
 
 # ========== MODEL ==========
 class HybridModel(nn.Module):
-    def __init__(self, input_dim):
+    def __init__(self, feature_type):
         super().__init__()
+        self.feature_type = feature_type.upper()
         self.qnn = q_layer
+
+        # Input size based on feature type
+        if self.feature_type in ["HOG", "PCA"]:
+            self.input_dim = NUM_QUBITS*2
+        elif self.feature_type == "PATCH":
+            self.input_dim = NUM_QUBITS * NUM_QUBITS  # 16 patches -> each 16-dim output -> total 256
+        else:
+            raise ValueError("Unsupported feature type")
+
         self.classifier = nn.Sequential(
-            nn.Linear(input_dim, 128),
+            nn.Linear(self.input_dim, 128),
             nn.BatchNorm1d(128),
             nn.ReLU(),
             nn.Dropout(0.3),
@@ -89,21 +99,22 @@ class HybridModel(nn.Module):
         )
 
     def forward(self, x):
-        if x.ndim == 2:
-            # x.shape = (batch_size, 32)
-            q_out = [self.qnn(xi) for xi in x]
-        elif x.ndim == 3:
-            # PATCH case: x.shape = (batch_size, 16, 16)
-            q_out = []
-            for xi in x:  # loop over batch
-                patch_outputs = [self.qnn(patch) for patch in xi]  # 16 patches
-                merged = torch.cat(patch_outputs)  # 16 * 16 = 256
-                q_out.append(merged)
-        else:
-            raise ValueError(f"Unexpected input shape: {x.shape}")
+        q_out = []
 
-        q_out = torch.stack(q_out)
+        if self.feature_type in ["HOG", "PCA"]:
+            # x.shape = (B, 16)
+            for xi in x:
+                q_out.append(self.qnn(xi))  # Each xi -> (16,)
+        elif self.feature_type == "PATCH":
+            # x.shape = (B, 16, 16)
+            for xi in x:  # xi: (16, 16)
+                patch_outputs = [self.qnn(patch) for patch in xi]  # 16 × (16,)
+                merged = torch.cat(patch_outputs)  # -> (256,)
+                q_out.append(merged)
+
+        q_out = torch.stack(q_out)  # Final shape: (B, input_dim)
         return self.classifier(q_out)
+
 
 # ========== SCHEDULER ==========
 def get_scheduler(optimizer):
@@ -184,7 +195,7 @@ def print_model_summary(model, input_shape):
         name = type(layer).__name__
         params = sum(p.numel() for p in layer.parameters() if p.requires_grad)
         total_c_params += params
-        print(f"  [{idx}] {name:<15} → Params: {params}")
+        print(f"  [{idx}] {name:<15} -> Params: {params}")
     print("="*60)
     print(f"Total Parameters: {total_q_params + total_c_params}")
     print(f"Trainable: {total_q_params + total_c_params}")
@@ -240,12 +251,7 @@ if __name__ == "__main__":
     val_loader = DataLoader(TensorDataset(X_val, y_val), batch_size=BATCH_SIZE)
     test_loader = DataLoader(TensorDataset(X_test, y_test), batch_size=BATCH_SIZE)
     # Infer input size based on feature type
-    if args.features == "PATCH":
-        input_dim = 256
-    else:
-        input_dim = 32  # default for HOG and PCA
-
-    model = HybridModel(input_dim=input_dim)
+    model = HybridModel(feature_type=args.features)
     print_model_summary(model, input_shape=(NUM_QUBITS,))
     train_acc, val_acc = train_model(model, train_loader, val_loader, device, args.features)
     plot_accuracy(train_acc, val_acc, args.features)

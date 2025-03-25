@@ -51,7 +51,7 @@ def mera_patch_circuit(inputs):
     return [qml.expval(qml.PauliZ(i)) for i in range(NUM_QUBITS)]
 
 def image_to_quantum_patches(image):
-    """Divide 256x256 image into 16 patches → downsample each patch to 16 values → MERA encode."""
+    """Divide 256x256 image into 16 patches -> downsample each patch to 16 values -> MERA encode."""
     if isinstance(image, torch.Tensor):
         image = image.numpy()
 
