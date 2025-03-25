@@ -70,9 +70,7 @@ The core idea is to use quantum circuits—specifically QCNNs built with MERA (M
 ## Dataset: ISIC 2018 Skin Cancer Classification
 
 - Public dataset for skin lesion diagnosis
-- This project simplifies the task to **binary classification**:
-  - **Benign** (e.g., nevi)
-  - **Malignant** (e.g., melanoma)
+- This project elaborates the task to **multiclass classification**:
 - Images are preprocessed using resizing, grayscale conversion, and contrast normalization.
 - Label balancing and data augmentation (e.g., flipping) are optionally applied.
 
