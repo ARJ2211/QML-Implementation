@@ -18,7 +18,7 @@ NUM_LAYERS = 29
 NUM_CLASSES = 9
 NUM_EPOCHS = 200
 BATCH_SIZE = 8
-LEARNING_RATE = 0.0005
+LEARNING_RATE = 0.01
 
 # ========== DATA LOADERS ==========
 def open_pkl(file_path):
@@ -78,7 +78,7 @@ class HybridModel(nn.Module):
         if self.feature_type in ["HOG", "PCA"]:
             self.input_dim = NUM_QUBITS*2
         elif self.feature_type == "PATCH":
-            self.input_dim = NUM_QUBITS * NUM_QUBITS  # 16 patches -> each 16-dim output -> total 256
+            self.input_dim = NUM_QUBITS * NUM_QUBITS * 2  # 16 patches -> each 16-dim output -> total 256
         else:
             raise ValueError("Unsupported feature type")
 
@@ -104,15 +104,17 @@ class HybridModel(nn.Module):
         if self.feature_type in ["HOG", "PCA"]:
             # x.shape = (B, 16)
             for xi in x:
-                q_out.append(self.qnn(xi))  # Each xi -> (16,)
+                q_out.append(self.qnn(xi))  # Each xi → (16,)
         elif self.feature_type == "PATCH":
+            # import pdb; pdb.set_trace()
             # x.shape = (B, 16, 16)
+            x = x.view(-1, 16, 16)
             for xi in x:  # xi: (16, 16)
-                patch_outputs = [self.qnn(patch) for patch in xi]  # 16 × (16,)
-                merged = torch.cat(patch_outputs)  # -> (256,)
+                patch_outputs = [self.qnn(patch).flatten() for patch in xi]  # 16 × (16,)
+                merged = torch.cat(patch_outputs, dim=0)  # → (256,)
                 q_out.append(merged)
 
-        q_out = torch.stack(q_out)  # Final shape: (B, input_dim)
+        q_out = torch.stack(q_out)  # Final shape: (B, 256)
         return self.classifier(q_out)
 
 
@@ -247,9 +249,9 @@ if __name__ == "__main__":
 
     (X_train, y_train), (X_val, y_val), (X_test, y_test) = load_dataset(args.features)
 
-    train_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(TensorDataset(X_val, y_val), batch_size=BATCH_SIZE)
-    test_loader = DataLoader(TensorDataset(X_test, y_test), batch_size=BATCH_SIZE)
+    train_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=BATCH_SIZE if args.features != 'PATCH' else 64, shuffle=True)
+    val_loader = DataLoader(TensorDataset(X_val, y_val), batch_size=BATCH_SIZE if args.features != 'PATCH' else 64)
+    test_loader = DataLoader(TensorDataset(X_test, y_test), batch_size=BATCH_SIZE if args.features != 'PATCH' else 64)
     # Infer input size based on feature type
     model = HybridModel(feature_type=args.features)
     print_model_summary(model, input_shape=(NUM_QUBITS,))

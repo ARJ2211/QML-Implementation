@@ -29,7 +29,7 @@ TRANSFORM = transforms.Compose([
 ])
 
 # ========== QUANTUM SETUP ==========
-template_weights = np.random.randn(NUM_LAYERS, NUM_QUBITS // 2, 2)
+template_weights = np.random.randn(NUM_LAYERS, 2)
 dev = qml.device("lightning.qubit", wires=NUM_QUBITS)
 
 def mera_block(weights, wires):
