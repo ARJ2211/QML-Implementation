@@ -18,7 +18,7 @@ np.random.seed(42)
 
 os.makedirs(r'q_dataset/FRAC_features/', exist_ok=True)
 
-num_qubits = 5  # 1 fractal slope + 4 entropy-like box-counting values
+NUM_QUBITS = 8  # 1 fractal slope + 7 entropy-like box-counting values
 
 # Image transformer to ensure 256x256 grayscale input
 TRANSFORM = transforms.Compose([
@@ -29,7 +29,7 @@ TRANSFORM = transforms.Compose([
 
 # ---------------------- Feature Extractor ----------------------
 
-def extract_fractal_features(image, scales=[2, 4, 8, 16]):
+def extract_fractal_features(image, scales=[2, 4, 8, 16, 32, 64, 128]):
     """
     Extracts fractal features using box-counting and entropy-like spatial complexity.
     Returns: [fractal_dim_slope, entropy_1, entropy_2, ...]
@@ -74,7 +74,10 @@ def image_to_fractal_features(image):
     features = extract_fractal_features(image)
 
     # Normalize features to [0, π] for use as quantum gate angles
-    norm_features = np.interp(features, (min(features), max(features)), (0, np.pi))
+
+    min_val = np.min(features)
+    max_val = np.max(features)
+    norm_features = np.interp(features, (min_val, max_val), (0, np.pi))
 
     return torch.tensor(norm_features, dtype=torch.float32)
 
@@ -156,8 +159,15 @@ def create_fractal_features(type="Train"):
     # Visualize the first 5 feature vectors as bar plots
     plt.figure(figsize=(10, 6))
     for i in range(min(5, len(all_features))):
-        plt.bar(np.arange(num_qubits) + i * 0.15, all_features[i], width=0.15, label=f'Sample {i}')
-    plt.xticks(np.arange(num_qubits), ['Slope', 'Entropy1', 'Entropy2', 'Entropy3', 'Entropy4'])
+        plt.bar(
+            np.arange(NUM_QUBITS) + i * 0.15,
+            all_features[i], width=0.15,
+            label=f'Sample {i}'
+        )
+    plt.xticks(
+        np.arange(NUM_QUBITS),
+        [f'Entropy {i+1}' for i in range(NUM_QUBITS)]
+    )
     plt.ylabel('Rotation Angle (0 to π)')
     plt.title(f'Fractal Quantum Features - {type}')
     plt.legend()
@@ -165,8 +175,6 @@ def create_fractal_features(type="Train"):
     plt.savefig(f'q_dataset/FRAC_features/fractal_feature_vectors_{type}.png')
     print(f"Saved visualization: fractal_feature_vectors_{type}.png")
 
-    print(f"\nSample quantum fractal feature vector:\n{all_features[0]}")
-    print("Label:", all_labels[0])
     return dataset
 
 # ---------------------- Entry ----------------------
