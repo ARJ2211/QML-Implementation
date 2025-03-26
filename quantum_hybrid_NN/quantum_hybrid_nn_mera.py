@@ -16,7 +16,7 @@ from tqdm import tqdm
 NUM_QUBITS = 16
 NUM_LAYERS = 29
 NUM_CLASSES = 9
-NUM_EPOCHS = 20
+NUM_EPOCHS = 200
 BATCH_SIZE = 8
 LEARNING_RATE = 0.01
 
@@ -128,7 +128,8 @@ def train_model(
         train_loader,
         val_loader,
         device,
-        feature_name
+        feature_name,
+        epochs
     ):
     model.to(device)
     criterion = nn.CrossEntropyLoss()
@@ -136,10 +137,10 @@ def train_model(
     scheduler = get_scheduler(optimizer)
     train_accs, val_accs = [], []
 
-    for epoch in range(NUM_EPOCHS):
+    for epoch in range(NUM_EPOCHS if not epochs else epochs):
         model.train()
         correct = 0
-        for X, y in tqdm(train_loader, desc=f"Epoch {epoch+1}/{NUM_EPOCHS}"):
+        for X, y in tqdm(train_loader, desc=f"Epoch {epoch+1}/{NUM_EPOCHS if not epochs else epochs}"):
             X, y = X.to(device), y.to(device)
             optimizer.zero_grad()
             out = model(X)
@@ -162,7 +163,7 @@ def train_model(
         val_accs.append(val_acc)
 
         scheduler.step()
-        print(f"Epoch {epoch+1}/{NUM_EPOCHS} | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
+        print(f"Epoch {epoch+1}/{NUM_EPOCHS if not epochs else epochs} | Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}")
     
     torch.save(model.state_dict(), f"quantum_hybrid_NN/results_{feature_name}/hybrid_model_weights.pth")
     print(f"Model saved to quantum_hybrid_NN/results_{feature_name}/hybrid_model_weights.pth")
@@ -237,6 +238,20 @@ if __name__ == "__main__":
         required=True,
         help="Choose which feature set to use: HOG, PCA, or PATCH"
     )
+    parser.add_argument(
+        "--batch",
+        type=int,
+        default=None,
+        required=False,
+        help="Choose batch size"
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=None,
+        required=False,
+        help="Choose epochs to run on"
+    )
     args = parser.parse_args()
     os.makedirs(
         f"quantum_hybrid_NN/results_{args.features}",
@@ -249,13 +264,24 @@ if __name__ == "__main__":
 
     (X_train, y_train), (X_val, y_val), (X_test, y_test) = load_dataset(args.features)
 
-    train_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=BATCH_SIZE if args.features != 'PATCH' else 64, shuffle=True)
-    val_loader = DataLoader(TensorDataset(X_val, y_val), batch_size=BATCH_SIZE if args.features != 'PATCH' else 64)
-    test_loader = DataLoader(TensorDataset(X_test, y_test), batch_size=BATCH_SIZE if args.features != 'PATCH' else 64)
+    train_loader = DataLoader(
+        TensorDataset(X_train, y_train),
+        batch_size=BATCH_SIZE if not args.batch else args.batch, shuffle=True
+    )
+    val_loader = DataLoader(
+        TensorDataset(X_val, y_val), 
+        batch_size=BATCH_SIZE if not args.batch else args.batch,
+        shuffle=True
+    )
+    test_loader = DataLoader(
+        TensorDataset(X_test, y_test),
+        batch_size=BATCH_SIZE if not args.batch else args.batch,
+        shuffle=True
+    )
     # Infer input size based on feature type
     model = HybridModel(feature_type=args.features)
     print_model_summary(model, input_shape=(NUM_QUBITS,))
-    train_acc, val_acc = train_model(model, train_loader, val_loader, device, args.features)
+    train_acc, val_acc = train_model(model, train_loader, val_loader, device, args.features, args.epochs)
     plot_accuracy(train_acc, val_acc, args.features)
 
     y_pred, y_true = evaluate_model(model, test_loader, device)

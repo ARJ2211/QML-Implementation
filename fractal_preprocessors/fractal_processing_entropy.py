@@ -19,7 +19,7 @@ warnings.filterwarnings('ignore')
 random.seed(42)
 np.random.seed(42)
 
-FEATURE_PATH = 'q_dataset/FRAC_features/'
+FEATURE_PATH = 'q_dataset/FRAC_ENTROPY_features/'
 os.makedirs(FEATURE_PATH, exist_ok=True)
 
 NUM_QUBITS = 16  # 1 slope + 7 entropies + 8 sobel
@@ -28,6 +28,25 @@ TRANSFORM = transforms.Compose([
     transforms.Grayscale(),
     transforms.ToTensor()
 ])
+
+# =========== ENTROPY MAP ============
+def entropy_map(image, grid_size=(4, 4)):
+    """
+    Divides image into grids and computes entropy for each grid.
+    Returns a flattened entropy map vector.
+    """
+    h, w = image.shape
+    gh, gw = grid_size
+    block_h, block_w = h // gh, w // gw
+    entropies = []
+    for i in range(gh):
+        for j in range(gw):
+            block = image[i*block_h:(i+1)*block_h, j*block_w:(j+1)*block_w]
+            hist, _ = np.histogram(block, bins=16, range=(0, 1), density=True)
+            hist = hist + 1e-9  # prevent log(0)
+            entropy = -np.sum(hist * np.log(hist))
+            entropies.append(entropy)
+    return np.array(entropies)
 
 # =========== FRACTAL FEATURE EXTRACTOR ============
 def extract_fractal_features(image, scales=[4, 8, 16, 32, 64, 128, 256]):
@@ -65,7 +84,7 @@ def extract_fractal_features(image, scales=[4, 8, 16, 32, 64, 128, 256]):
 def image_to_fractal_features(image, stats):
     """
     Applies fractal feature extraction on original and Sobel image.
-    Standardizes using precomputed stats (mean, std per feature).
+    Adds entropy map values. Standardizes with precomputed stats.
     """
     if isinstance(image, torch.Tensor):
         image = image.numpy().squeeze()
@@ -75,18 +94,22 @@ def image_to_fractal_features(image, stats):
 
     image = resize(image, (256, 256), anti_aliasing=True)
 
+    # Adaptive thresholding
     thresh = threshold_otsu(image)
     image_bin = (image > thresh).astype(np.float32)
-    features_orig = extract_fractal_features(image_bin)
-
 
     sobel_img = sobel(image)
-    thresh = threshold_otsu(sobel_img)
-    sobel_bin = (sobel_img > thresh).astype(np.float32)
+    sobel_thresh = threshold_otsu(sobel_img)
+    sobel_bin = (sobel_img > sobel_thresh).astype(np.float32)
+
+    features_orig = extract_fractal_features(image_bin)
     features_sobel = extract_fractal_features(sobel_bin)
 
-    combined = np.array(features_orig + features_sobel)  # 16D
-    standardized = (combined - stats["mean"]) / (stats["std"] + 1e-8)
+    # Append 2D entropy maps (e.g., 4x4 = 16D)
+    emap = entropy_map(image, grid_size=(4, 4))
+    features = np.concatenate([features_orig, features_sobel, emap])  # 8+8+16 = 32D
+
+    standardized = (features - stats["mean"]) / (stats["std"] + 1e-8)
     return torch.tensor(standardized, dtype=torch.float32)
 
 # ========== DATASET ==============
@@ -128,13 +151,16 @@ def create_fractal_features(type="Train"):
         img_np = np.array(img.convert("L"))
         img_np = resize(img_np, (256, 256), anti_aliasing=True)
 
-        bin_img = (img_np > threshold_otsu(img_np)).astype(np.float32)
+        thresh_img = (img_np > threshold_otsu(img_np)).astype(np.float32)
         sobel_img = sobel(img_np)
-        bin_sobel = (sobel_img > threshold_otsu(sobel_img)).astype(np.float32)
+        thresh_sobel = (sobel_img > threshold_otsu(sobel_img)).astype(np.float32)
 
-        f1 = extract_fractal_features(bin_img)
-        f2 = extract_fractal_features(bin_sobel)
-        raw_features.append(f1 + f2)
+        f1 = extract_fractal_features(thresh_img)
+        f2 = extract_fractal_features(thresh_sobel)
+        emap = entropy_map(img_np, grid_size=(4, 4))
+
+        combined = np.concatenate([f1, f2, emap])
+        raw_features.append(combined)
         labels.append(label)
 
     raw_features = np.array(raw_features)
@@ -170,11 +196,11 @@ def create_fractal_features(type="Train"):
     plt.figure(figsize=(10, 6))
     for i in range(min(5, len(norm_features))):
         plt.bar(
-            np.arange(NUM_QUBITS) + i * 0.15,
+            np.arange(len(norm_features[i])) + i * 0.15,
             norm_features[i], width=0.15,
             label=f'Sample: {i} Label: {labels[i]}'
         )
-    plt.xticks(np.arange(NUM_QUBITS), [f"F{i+1}" for i in range(NUM_QUBITS)])
+    plt.xticks(np.arange(len(norm_features[0])), [f"F{i+1}" for i in range(len(norm_features[0]))])
     plt.ylabel("Normalized Feature Value")
     plt.title(f"Fractal Quantum Features - {type}")
     plt.legend()
