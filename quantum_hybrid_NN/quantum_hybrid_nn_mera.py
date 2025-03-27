@@ -75,7 +75,7 @@ class HybridModel(nn.Module):
         self.qnn = q_layer
 
         # Input size based on feature type
-        if self.feature_type in ["HOG", "PCA"]:
+        if self.feature_type in ["HOG", "PCA", "FRAC"]:
             self.input_dim = NUM_QUBITS*2
         elif self.feature_type == "PATCH":
             self.input_dim = NUM_QUBITS * NUM_QUBITS * 2  # 16 patches -> each 16-dim output -> total 256
@@ -101,7 +101,7 @@ class HybridModel(nn.Module):
     def forward(self, x):
         q_out = []
 
-        if self.feature_type in ["HOG", "PCA"]:
+        if self.feature_type in ["HOG", "PCA", "FRAC"]:
             # x.shape = (B, 16)
             for xi in x:
                 q_out.append(self.qnn(xi))  # Each xi → (16,)
@@ -234,9 +234,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--features",
         type=str,
-        choices=["HOG", "PCA", "PATCH"],
+        choices=["HOG", "PCA", "PATCH", "FRAC"],
         required=True,
-        help="Choose which feature set to use: HOG, PCA, or PATCH"
+        help="Choose which feature set to use: HOG, PCA, PATCH or FRAC"
     )
     parser.add_argument(
         "--batch",
