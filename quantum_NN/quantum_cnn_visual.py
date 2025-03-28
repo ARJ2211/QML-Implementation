@@ -59,18 +59,23 @@ def qcnn_forward(x):
     state_preparation()
     encode_features(x)
 
-    qubits = list(range(NUM_QUBITS))  # 16 → 8 → 4 → 2 → 1
+    qubits = list(range(NUM_QUBITS))  # 16 -> 8 -> 4 -> 2 -> 1
     print('QUBITS: ', qubits)
-    while len(qubits) > 1:
+    while len(qubits) > 4:
         conv_layer()
         qubits = pooling_layer(qubits)
         print('QUBITS: ', qubits)
 
+    return [
+        qml.expval(qml.PauliZ(q)) for q in qubits
+    ]  # Final 4 qubit output
 
-    return qml.expval(qml.PauliZ(qubits[0]))  # Final 1 qubit output
-
-dummy_input = np.random.uniform(0, 2 * np.pi, size=(16,))
+dummy_input = np.random.uniform(
+    -np.pi, 
+    np.pi, 
+    size=(NUM_QUBITS,)
+)
 out = qcnn_forward(dummy_input)
+print("Output PauliZ on Qubit 0:", out)
 qml.draw_mpl(qcnn_forward)(dummy_input)
 plt.savefig(r'quantum_NN/QCNN_Visualization.jpg')
-print("Output PauliZ on Qubit 0:", out)

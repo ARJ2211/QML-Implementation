@@ -52,6 +52,7 @@ def mera_block(weights, wires):
 # ========== QNODE ==========
 dev = qml.device("lightning.qubit", wires=NUM_QUBITS)
 
+@qml.qnode(device='lightning.qubit', interface='torch')
 def qnode(inputs, weights):
     qml.AngleEmbedding(inputs, wires=range(NUM_QUBITS), rotation="Y")
     qml.templates.MERA(
@@ -63,9 +64,8 @@ def qnode(inputs, weights):
     )
     return [qml.expval(qml.PauliZ(i)) for i in range(NUM_QUBITS)]
 
-qnode_torch = qml.QNode(qnode, dev, interface="torch")
 weight_shapes = {"weights": (NUM_LAYERS, NUM_QUBITS // 2, 2)}
-q_layer = TorchLayer(qnode_torch, weight_shapes)
+q_layer = TorchLayer(qnode, weight_shapes)
 
 # ========== MODEL ==========
 class HybridModel(nn.Module):
