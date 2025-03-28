@@ -140,8 +140,7 @@ The core idea is to use quantum circuits—specifically QCNNs built with MERA (M
 
 | ![fractal scale](quantum_hybrid_NN/results_PCA/hybrid_accuracy_plot.png) |
 | :----------------------------------------------------------------------: |
-
-| Accuracy vs Validation + Confusion matrix |
+|                Accuracy vs Validation + Confusion matrix                 |
 
 ---
 
