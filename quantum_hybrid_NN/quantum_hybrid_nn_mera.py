@@ -52,7 +52,7 @@ def mera_block(weights, wires):
 # ========== QNODE ==========
 dev = qml.device("lightning.qubit", wires=NUM_QUBITS)
 
-@qml.qnode(device='lightning.qubit', interface='torch')
+@qml.qnode(dev, interface='torch')
 def qnode(inputs, weights):
     qml.AngleEmbedding(inputs, wires=range(NUM_QUBITS), rotation="Y")
     qml.templates.MERA(

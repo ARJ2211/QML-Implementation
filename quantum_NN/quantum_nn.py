@@ -148,7 +148,13 @@ class QuantumPureQCNN(nn.Module):
     def __init__(self):
         super().__init__()
         self.qnn = torch_qcnn
-        self.linear = nn.Linear(4, NUM_CLASSES)
+        self.linear = nn.Sequential(
+            nn.Linear(4, 16),
+            nn.ReLU(),
+            nn.Linear(16, 32),
+            nn.ReLU(),
+            nn.Linear(32, NUM_CLASSES)
+        )
 
     def forward(self, x):
         q_out = [self.qnn(xi) for xi in x]
@@ -283,8 +289,8 @@ if __name__ == "__main__":
         args.epochs
     )
     torch.save(
-        model.state_dict(), f"quantum_NN/results_{args.feature}/qcnn_model_weights.pth"
+        model.state_dict(), f"quantum_NN/results_{args.features}/qcnn_model_weights.pth"
     )
     print(
-        f"Model saved to quantum_NN/results_{args.feature}/qcnn_model_weights.pth"
+        f"Model saved to quantum_NN/results_{args.features}/qcnn_model_weights.pth"
     )
