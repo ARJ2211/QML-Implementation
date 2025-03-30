@@ -4,7 +4,7 @@
 
 This project implements both **hybrid** and **pure** quantum-classical neural networks based on the paper:
 
-**"Quantum convolutional neural network for image classification"**
+**"Quantum convolutional neural network for image classification"**  
 _Guoming Chen et al., Pattern Analysis and Applications, 2023_
 
 The core idea is to use quantum circuits—specifically QCNNs built with MERA (Multi-scale Entanglement Renormalization Ansatz) and a newly added **pure QCNN**—to extract and process multi-scale features from classical image datasets. This implementation evaluates these models on a binary skin cancer classification task using the **ISIC 2018 dataset**.
@@ -97,25 +97,25 @@ The core idea is to use quantum circuits—specifically QCNNs built with MERA (M
 3. MERA Quantum Circuit → Quantum Feature Vector
 4. Classical Fully Connected Network → Prediction
 
-| ![Hybrid Quantum NN.png](quantum_hybrid_NN/quantum_hybrid_NN.png) |
-| :---------------------------------------------------------------: |
-|                         Hybrid quantum NN                         |
+| ![Hybrid Quantum NN](quantum_hybrid_NN/quantum_hybrid_NN.png) |
+| :-----------------------------------------------------------: |
+|                Hybrid quantum NN Architecture                 |
 
 ### Pure QCNN Model
 
 1. Image → Classical Feature Vector (FRAC, FRAC + Entropy)
 2. Quantum Encoding + Pure QCNN:
-
    - Cluster state initialization (H + CZ)
    - Feature encoding (RX, RY, RZ)
    - Convolution (Ising gates)
    - Pooling (CNOT + RY)
-
 3. Final 4 qubits → PauliZ → 4D vector → Linear Layer → Prediction
 
-| ![quantum_circuit.jpg](quantum_NN/QCNN_Visualization.jpg) |
-| :-------------------------------------------------------: |
-|          Pure Quantum Circuit with Pool and Conv          |
+| ![QCNN Circuit](quantum_NN/QCNN_Visualization.jpg) |
+| :------------------------------------------------: |
+|      Pure Quantum Circuit with Pool and Conv       |
+
+---
 
 ## Evaluation
 
@@ -123,24 +123,67 @@ The core idea is to use quantum circuits—specifically QCNNs built with MERA (M
 - Robustness (planned)
 - Visualizations of quantum circuit and feature flow
 
-##### Fractal Scale Feature Extraction (Hybrid)
+### Hybrid QCNN Results
 
-|  ![fractal scale](quantum_hybrid_NN/results_FRAC_20/hybrid_accuracy_plot.png)   |
+#### FRAC (20-dimensional fractal features)
+
+|     ![FRAC](quantum_hybrid_NN/results_FRAC_20/hybrid_accuracy_plot.png)     |
+| :-------------------------------------------------------------------------: |
+| ![Confusion](quantum_hybrid_NN/results_FRAC_20/hybrid_confusion_matrix.png) |
+|             Accuracy vs Validation + Confusion matrix (FRAC-20)             |
+
+#### HOG
+
+|       ![HOG](quantum_hybrid_NN/results_HOG/hybrid_accuracy_plot.png)        |
+| :-------------------------------------------------------------------------: |
+| ![HOG Confusion](quantum_hybrid_NN/results_HOG/hybrid_confusion_matrix.png) |
+|            Accuracy vs Validation + Confusion matrix (HOG-MERA)             |
+
+#### PCA
+
+|       ![PCA](quantum_hybrid_NN/results_PCA/hybrid_accuracy_plot.png)        |
+| :-------------------------------------------------------------------------: |
+| ![PCA Confusion](quantum_hybrid_NN/results_PCA/hybrid_confusion_matrix.png) |
+|            Accuracy vs Validation + Confusion matrix (PCA-MERA)             |
+
+#### PATCH
+
+|       ![PATCH](quantum_hybrid_NN/results_PATCH/hybrid_accuracy_plot.png)        |
 | :-----------------------------------------------------------------------------: |
-| ![confusion.jpg](quantum_hybrid_NN/results_FRAC_20/hybrid_confusion_matrix.png) |
-|                    Accuracy vs Validation + Confusion matrix                    |
+| ![PATCH Confusion](quantum_hybrid_NN/results_PATCH/hybrid_confusion_matrix.png) |
+|             Accuracy vs Validation + Confusion matrix (PATCH-MERA)              |
 
-##### HOG + MERA Feature Extraction (Hybrid with trainable MERA)
+---
 
-| ![fractal scale](quantum_hybrid_NN/results_HOG/hybrid_accuracy_plot.png) |
-| :----------------------------------------------------------------------: |
-|                Accuracy vs Validation + Confusion matrix                 |
+### Pure QCNN Results
 
-##### PCA + MERA Feature Extraction (Hybrid with trainable MERA)
+#### FRAC
 
-| ![fractal scale](quantum_hybrid_NN/results_PCA/hybrid_accuracy_plot.png) |
-| :----------------------------------------------------------------------: |
-|                Accuracy vs Validation + Confusion matrix                 |
+|     ![FRAC Pure](quantum_NN/results_FRAC/qcnn_accuracy_plot.png)     |
+| :------------------------------------------------------------------: |
+| ![FRAC Confusion](quantum_NN/results_FRAC/qcnn_confusion_matrix.png) |
+|        Accuracy vs Validation + Confusion matrix (QCNN-FRAC)         |
+
+#### FRAC + Entropy Map
+
+|     ![FRAC Entropy](quantum_NN/results_FRAC_ENTROPY/qcnn_accuracy_plot.png)     |
+| :-----------------------------------------------------------------------------: |
+| ![FRAC Entropy Conf](quantum_NN/results_FRAC_ENTROPY/qcnn_confusion_matrix.png) |
+|          Accuracy vs Validation + Confusion matrix (QCNN-FRAC+Entropy)          |
+
+#### HOG
+
+|     ![HOG QCNN](quantum_NN/results_HOG/qcnn_accuracy_plot.png)     |
+| :----------------------------------------------------------------: |
+| ![HOG Confusion](quantum_NN/results_HOG/qcnn_confusion_matrix.png) |
+|        Accuracy vs Validation + Confusion matrix (QCNN-HOG)        |
+
+#### PATCH
+
+|     ![PATCH QCNN](quantum_NN/results_PATCH/qcnn_accuracy_plot.png)     |
+| :--------------------------------------------------------------------: |
+| ![PATCH Confusion](quantum_NN/results_PATCH/qcnn_confusion_matrix.png) |
+|         Accuracy vs Validation + Confusion matrix (QCNN-PATCH)         |
 
 ---
 
@@ -150,21 +193,4 @@ Install dependencies:
 
 ```bash
 pip install -r requirements.txt
-```
-
-Train any model:
-
-```bash
-python quantum_NN/quantum_nn.py --features FRAC_ENTROPY --epochs 100
-```
-
----
-
-## Important CLI Arguments:
-
-```bash
---features: One of [HOG, PCA, PATCH, FRAC, FRAC_ENTROPY]
---epochs: Number of training epochs (default: 100)
---batch: Batch size for training (default: 8)
---n_qubits: Set internally based on feature type
 ```
