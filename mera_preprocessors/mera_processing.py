@@ -22,7 +22,7 @@ TRANSFORM = transforms.Compose([
 ])
 
 # Define quantum device
-num_qubits = 8  # Set number of qubits
+num_qubits = 16  # Set number of qubits
 dev = qml.device("default.qubit", wires=num_qubits)
 
 # Define a quantum block for MERA
