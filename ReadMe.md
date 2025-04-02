@@ -194,3 +194,16 @@ Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
+Run preprocessors:
+```bash
+python3 <preprocessor_dir>/<preprocessor_type>.py
+```
+Run hybrid model:
+```bash
+python3 quantum_hybrid_NN/quantum_hybrid_nn_mera.py --batch <batch size> --feature ['PCA', 'HOG', 'PATCH', 'FRAC', 'FRAC_ENTOPY']
+```
+Run pure model:
+```bash
+python3 quantum_NN/quantum_nn.py --batch <batch size> --feature ['PCA', 'HOG', 'PATCH', 'FRAC', 'FRAC_ENTOPY']
+```
+
